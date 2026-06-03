@@ -345,7 +345,7 @@ def load_whitelist():
                 data = json.load(f)
                 whitelisted = data.get("whitelisted_uids", {})
                 for uid, expiry in whitelisted.items():
-                    if expiry > time.time():
+                    if expiry > time.time() and uid:
                         new_uids.add(str(uid))
                         print(f"[✓] whitelist.json: {uid}")
         except:
@@ -580,8 +580,32 @@ def create_colored_error_message(uid):
     )
     return message.encode('utf-8')
 
+# Simple HTTP handler to prevent redirect loops
+class SimpleHTTPHandler(http.Handler):
+    def request(self, flow):
+        # Block direct browser access to prevent redirect loops
+        if flow.request.host == "freefire-proxy.onrender.com" and flow.request.path == "/":
+            flow.response = http.Response.make(
+                200,
+                b"Proxy is running. Configure your device to use this proxy.",
+                {"Content-Type": "text/plain"}
+            )
+            return
+
 class MajorLoginInterceptor:
     def request(self, flow):
+        # Block direct browser access
+        if flow.request.host == "freefire-proxy.onrender.com":
+            if flow.request.path == "/":
+                flow.response = http.Response.make(
+                    200,
+                    b"FreeFire Proxy is running. This is not a web server.\n"
+                    b"Configure your device proxy to use this server.\n"
+                    b"Proxy Port: 9944",
+                    {"Content-Type": "text/plain"}
+                )
+                return
+        
         try:
             if flow.request.method.upper() != "POST":
                 return
